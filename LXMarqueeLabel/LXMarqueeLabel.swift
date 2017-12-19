@@ -73,10 +73,19 @@ class LXMarqueeLabel: UIView {
         }
     }
 
+
     private var onscreenTextLabels: [TextLabel] = []
     private var offscreenTextLabels: [TextLabel] = []
 
-    private var displayLink: CADisplayLink!
+    private var displayLink: CADisplayLink?
+
+    deinit {
+        invalidateDisplayLink()
+    }
+}
+
+private extension LXMarqueeLabel {
+    class TextLabel: UILabel {}
 }
 
 // MARK: - 开始|停止滚动
@@ -84,26 +93,30 @@ extension LXMarqueeLabel {
 
     /// 开始滚动
     func startScrolling() {
-        if state == .scrolling { return }
-        if textList.isEmpty { return }
-        if window == nil { return }
+        guard state != .scrolling else { return }
+        guard !textList.isEmpty else { return }
+
         if state == .stopped {
             addNextTextLabel()
         }
-        resumeDisplayLink()
+
+        if window != nil {
+            resumeDisplayLink()
+        }
+
         state = .scrolling
     }
 
     /// 暂停滚动
     func pauseScrolling() {
-        if state != .scrolling { return }
+        guard state == .scrolling else { return }
         pauseDisplayLink()
         state = .paused
     }
 
     /// 停止滚动
     func stopScrolling() {
-        if state == .stopped { return }
+        guard state != .stopped else { return }
         nextIndex = 0
         pauseDisplayLink()
         onscreenTextLabels.forEach { $0.removeFromSuperview() }
@@ -113,9 +126,9 @@ extension LXMarqueeLabel {
 }
 
 // MARK: - 循环利用
-private extension LXMarqueeLabel {
+extension LXMarqueeLabel {
     
-    func dequeueReusableTextLabel() -> TextLabel {
+    private func dequeueReusableTextLabel() -> TextLabel {
         if let textLabel = offscreenTextLabels.popLast() {
             return textLabel
         }
@@ -127,7 +140,7 @@ private extension LXMarqueeLabel {
         return textLabel
     }
 
-    func recycle(_ textLabel: TextLabel) {
+    private func recycle(_ textLabel: TextLabel) {
         offscreenTextLabels.append(textLabel)
     }
 }
@@ -155,34 +168,42 @@ private extension LXMarqueeLabel {
 
 // MARK: - 定时器
 private extension LXMarqueeLabel {
-
-    func initDisplayLink() {
-        precondition(displayLink == nil)
-        displayLink = CADisplayLink(target: self, selector: #selector(step))
-        displayLink.isPaused = (state != .scrolling)
-        displayLink.add(to: RunLoop.main, forMode: .commonModes)
-    }
-
+    
     func invalidateDisplayLink() {
-        displayLink.invalidate()
+        displayLink?.invalidate()
         displayLink = nil
     }
 
     func resumeDisplayLink() {
-        displayLink.isPaused = false
+        if displayLink == nil {
+            let target = DisplayLinkTarget(owner: self)
+            let displayLink = CADisplayLink(target: target, selector: #selector(DisplayLinkTarget.step))
+            displayLink.add(to: .main, forMode: .commonModes)
+            self.displayLink = displayLink
+        }
+        displayLink?.isPaused = false
     }
 
     func pauseDisplayLink() {
-        displayLink.isPaused = true
+        displayLink?.isPaused = true
     }
 
-    @objc func step(_ displayLink: CADisplayLink) {
-        bounds.origin.x += textScrollSpeed * CGFloat(displayLink.duration)
-        if let firstLabelMaxX = onscreenTextLabels.first?.frame.maxX, firstLabelMaxX <= bounds.minX {
-            onscreenTextLabels.removeFirst().removeFromSuperview()
+    class DisplayLinkTarget {
+        weak var owner: LXMarqueeLabel?
+
+        init(owner: LXMarqueeLabel) {
+            self.owner = owner
         }
-        if let lastLabelMaxX = onscreenTextLabels.last?.frame.maxX, bounds.maxX - lastLabelMaxX >= textSpacing {
-            addNextTextLabel()
+
+        @objc func step(_ displayLink: CADisplayLink) {
+            guard let marqueeLabel = owner else { return }
+            marqueeLabel.bounds.origin.x += marqueeLabel.textScrollSpeed * CGFloat(displayLink.duration)
+            if let firstLabelMaxX = marqueeLabel.onscreenTextLabels.first?.frame.maxX, firstLabelMaxX <= marqueeLabel.bounds.minX {
+                marqueeLabel.onscreenTextLabels.removeFirst().removeFromSuperview()
+            }
+            if let lastLabelMaxX = marqueeLabel.onscreenTextLabels.last?.frame.maxX, marqueeLabel.bounds.maxX - lastLabelMaxX >= marqueeLabel.textSpacing {
+                marqueeLabel.addNextTextLabel()
+            }
         }
     }
 }
@@ -196,13 +217,11 @@ extension LXMarqueeLabel {
         }
     }
 
-    override func willMove(toWindow newWindow: UIWindow?) {
-        if newWindow == nil {
+    override func didMoveToWindow() {
+        if window == nil {
             invalidateDisplayLink()
-        } else {
-            initDisplayLink()
+        } else if state == .scrolling {
+            resumeDisplayLink()
         }
     }
 }
-
-private class TextLabel: UILabel {}
