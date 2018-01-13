@@ -217,11 +217,11 @@ extension LXMarqueeLabel {
         }
     }
 
-    override func didMoveToWindow() {
-        if window == nil {
-            invalidateDisplayLink()
-        } else if state == .scrolling {
-            resumeDisplayLink()
-        }
-    }
+	override func willMove(toWindow newWindow: UIWindow?) {
+		if newWindow == nil {
+			pauseDisplayLink()
+		} else if state == .scrolling {
+			resumeDisplayLink()
+		}
+	}
 }
