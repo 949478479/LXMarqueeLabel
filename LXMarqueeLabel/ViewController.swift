@@ -22,22 +22,22 @@ class ViewController: UIViewController {
 
 //    override func viewDidAppear(_ animated: Bool) {
 //        super.viewDidAppear(animated)
-//        marqueeLabel.startScrolling()
+//        marqueeLabel.run()
 //    }
 //
 //    override func viewDidDisappear(_ animated: Bool) {
 //        super.viewDidAppear(animated)
-//        marqueeLabel.pauseScrolling()
+//        marqueeLabel.pause()
 //    }
 
     @IBAction func controlButtonTapped(_ sender: UIButton) {
         switch sender.tag {
         case 0:
-            marqueeLabel.startScrolling()
+            marqueeLabel.run()
         case 1:
-            marqueeLabel.pauseScrolling()
+            marqueeLabel.pause()
         case 2:
-            marqueeLabel.stopScrolling()
+            marqueeLabel.stop()
         default:
             fatalError()
         }

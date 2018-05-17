@@ -2,8 +2,8 @@
 //  LXMarqueeLabel.swift
 //  LXMarqueeLabel
 //
-//  Created by 冠霖环如 on 2017/11/16.
-//  Copyright © 2017年 冠霖环如. All rights reserved.
+//  Created by 从今以后 on 2017/11/16.
+//  Copyright © 2017年 从今以后. All rights reserved.
 //
 
 import UIKit
@@ -11,12 +11,13 @@ import UIKit
 class LXMarqueeLabel: UIView {
 
     enum State {
-        case scrolling, paused, stopped
+        case running, paused, stopped
     }
 
     var isPaused: Bool { return state == .paused }
+    var isRunning: Bool { return state == .running }
     var isStopped: Bool { return state == .stopped }
-    var isScrolling: Bool { return state == .scrolling }
+
     private(set) var state: State = .stopped
 
     /// 文本间距，只能在 stopped 状态下设置
@@ -33,10 +34,9 @@ class LXMarqueeLabel: UIView {
         }
     }
 
-    /// 文本颜色，默认 black，只能在 stopped 状态下设置
+    /// 文本颜色，默认 black
     @IBInspectable var textColor: UIColor = .black {
         willSet {
-            precondition(state == .stopped)
             offscreenTextLabels.forEach { $0.textColor = newValue }
         }
     }
@@ -49,19 +49,17 @@ class LXMarqueeLabel: UIView {
         }
     }
 
-    /// 只能在 stopped 状态下设置
-    override var backgroundColor: UIColor? {
-        didSet {
-            precondition(state == .stopped)
-            offscreenTextLabels.forEach { $0.backgroundColor = backgroundColor }
-        }
-    }
-
     /// 文本列表
     var textList: [String] = [] {
         willSet {
-            stopScrolling()
+            stop()
             nextIndex = newValue.isEmpty ? -1 : 0
+        }
+    }
+
+    override var backgroundColor: UIColor? {
+        didSet {
+            offscreenTextLabels.forEach { $0.backgroundColor = backgroundColor }
         }
     }
 
@@ -73,7 +71,6 @@ class LXMarqueeLabel: UIView {
         }
     }
 
-
     private var onscreenTextLabels: [TextLabel] = []
     private var offscreenTextLabels: [TextLabel] = []
 
@@ -82,18 +79,33 @@ class LXMarqueeLabel: UIView {
     deinit {
         invalidateDisplayLink()
     }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        clipsToBounds = true
+    }
+
+    required init?(coder aDecoder: NSCoder) {
+        super.init(coder: aDecoder)
+        clipsToBounds = true
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        onscreenTextLabels.forEach { $0.center.y = frame.height * 0.5 }
+    }
 }
 
 private extension LXMarqueeLabel {
     class TextLabel: UILabel {}
 }
 
-// MARK: - 开始|停止滚动
+// MARK: - 滚动控制
 extension LXMarqueeLabel {
 
     /// 开始滚动
-    func startScrolling() {
-        guard state != .scrolling else { return }
+    func run() {
+        guard !isRunning else { return }
         guard !textList.isEmpty else { return }
 
         if state == .stopped {
@@ -104,19 +116,19 @@ extension LXMarqueeLabel {
             resumeDisplayLink()
         }
 
-        state = .scrolling
+        state = .running
     }
 
     /// 暂停滚动
-    func pauseScrolling() {
-        guard state == .scrolling else { return }
+    func pause() {
+        guard isRunning else { return }
         pauseDisplayLink()
         state = .paused
     }
 
     /// 停止滚动
-    func stopScrolling() {
-        guard state != .stopped else { return }
+    func stop() {
+        guard !isStopped else { return }
         nextIndex = 0
         pauseDisplayLink()
         onscreenTextLabels.forEach { $0.removeFromSuperview() }
@@ -147,6 +159,7 @@ extension LXMarqueeLabel {
 
 // MARK: - 添加标签
 private extension LXMarqueeLabel {
+
     func addNextTextLabel() {
         let currentIndex = nextIndex
         nextIndex += 1
@@ -154,7 +167,7 @@ private extension LXMarqueeLabel {
         let textLabel = dequeueReusableTextLabel()
         textLabel.text = textList[currentIndex]
         textLabel.sizeToFit()
-        textLabel.center.y = bounds.midY
+        textLabel.center.y = frame.height * 0.5
         if let lastLabelFrame = onscreenTextLabels.last?.frame {
             textLabel.frame.origin.x = lastLabelFrame.maxX + textSpacing
         } else {
@@ -220,7 +233,7 @@ extension LXMarqueeLabel {
 	override func willMove(toWindow newWindow: UIWindow?) {
 		if newWindow == nil {
 			pauseDisplayLink()
-		} else if state == .scrolling {
+		} else if isRunning {
 			resumeDisplayLink()
 		}
 	}
