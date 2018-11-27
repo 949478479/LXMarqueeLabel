@@ -354,7 +354,7 @@ private extension LXMarqueeLabel {
         if displayLink == nil {
             let target = DisplayLinkTarget(owner: self)
             let displayLink = CADisplayLink(target: target, selector: #selector(DisplayLinkTarget.step))
-            displayLink.add(to: .main, forMode: .commonModes)
+            displayLink.add(to: .main, forMode: .common)
             self.displayLink = displayLink
         }
         displayLink?.isPaused = false
